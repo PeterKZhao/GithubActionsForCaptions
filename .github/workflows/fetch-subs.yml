@@ -13,7 +13,7 @@ on:
         default: "zh-Hans,zh-Hant,en.*"
         type: string
       user_agent:
-        description: "可选：浏览器UA（遇到风控时可配合cookies），留空则不传"
+        description: "可选：浏览器UA（遇到风控可配合cookies），留空则不传"
         required: false
         default: ""
         type: string
@@ -24,25 +24,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1) 装 Node 作为 JS runtime（给 yt-dlp 用）
+      # Node 作为 yt-dlp 的 JS runtime
       - name: Setup Node.js
-      - uses: actions/setup-node@v4
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install yt-dlp
         run: python -m pip install -U yt-dlp
 
-      # 2) （可选）写入 cookies.txt：把仓库 Secret: YTDLP_COOKIES_TXT 解码
+      # 可选：把明文 cookies Secret 写入 cookies.txt
       - name: Write cookies.txt (optional)
         env:
           YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
+        shell: bash
         run: |
-          printf '%s' "$YTDLP_COOKIES_TXT" | base64 -d > cookies.txt
+          # 写入并去掉可能的 Windows CRLF
+          printf '%s' "$YTDLP_COOKIES_TXT" | tr -d '\r' > cookies.txt
           echo "cookies.txt written"
 
       - name: Download subtitles only
@@ -51,11 +54,12 @@ jobs:
           LANGS: ${{ inputs.langs }}
           UA: ${{ inputs.user_agent }}
           HAS_COOKIES: ${{ secrets.YTDLP_COOKIES_TXT != '' }}
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p subs
 
-          # 先列出可用字幕（便于确认语言标签）
+          # 先列出可用字幕（有助于确认语言标签）
           if [ "$HAS_COOKIES" = "true" ]; then
             yt-dlp --js-runtimes node --cookies cookies.txt --list-subs "$URL" || true
           else
