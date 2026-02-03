@@ -40,9 +40,9 @@ jobs:
       # 2) （可选）写入 cookies.txt：把仓库 Secret: YTDLP_COOKIES_TXT 解码
       - name: Write cookies.txt (optional)
         env:
-          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_TXT }}
+          YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
         run: |
-          printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > cookies.txt
+          printf '%s' "$YTDLP_COOKIES_TXT" | base64 -d > cookies.txt
           echo "cookies.txt written"
 
       - name: Download subtitles only
@@ -50,7 +50,7 @@ jobs:
           URL: ${{ inputs.url }}
           LANGS: ${{ inputs.langs }}
           UA: ${{ inputs.user_agent }}
-          HAS_COOKIES: ${{ secrets.YTDLP_COOKIES_B64 != '' }}
+          HAS_COOKIES: ${{ secrets.YTDLP_COOKIES_TXT != '' }}
         run: |
           set -e
           mkdir -p subs
