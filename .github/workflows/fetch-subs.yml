@@ -1,0 +1,56 @@
+name: Fetch subtitles (Bilibili / YouTube)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "B站或YouTube视频链接"
+        required: true
+        type: string
+      langs:
+        description: "字幕语言(逗号分隔，可用正则；示例 zh-Hans,zh-Hant,en.*)"
+        required: false
+        default: "zh-Hans,zh-Hant,en.*"
+        type: string
+
+jobs:
+  subs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install yt-dlp
+        run: python -m pip install -U yt-dlp
+
+      - name: Download subtitles only
+        env:
+          URL: ${{ inputs.url }}
+          LANGS: ${{ inputs.langs }}
+        run: |
+          mkdir -p subs
+
+          # 1) 列出可用字幕/自动字幕
+          yt-dlp --list-subs "$URL"
+
+          # 2) 只下载字幕（含自动字幕），并尽量转成 srt
+          yt-dlp \
+            --skip-download \
+            --write-subs \
+            --write-auto-subs \
+            --sub-langs "$LANGS" \
+            --sub-format "vtt/best" \
+            --convert-subs "srt" \
+            -o "subs/%(title).200s_%(id)s.%(ext)s" \
+            "$URL"
+
+          ls -la subs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: subtitles
+          path: subs/
