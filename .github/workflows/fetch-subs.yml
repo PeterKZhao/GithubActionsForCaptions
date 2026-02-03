@@ -46,6 +46,13 @@ jobs:
         run: |
           printf '%s' "$YTDLP_COOKIES_TXT" | tr -d '\r' > cookies.txt
           echo "cookies.txt written"
+          
+      - name: Install ffmpeg
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
 
       - name: Download subtitles only
         env:
