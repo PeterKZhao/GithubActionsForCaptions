@@ -8,14 +8,9 @@ on:
         required: true
         type: string
       langs:
-        description: "字幕语言(逗号分隔/可正则)，示例：zh-Hans,zh-Hant,en.*"
+        description: "字幕语言(逗号分隔，可用正则；示例 zh-Hans,zh-Hant,en.*)"
         required: false
         default: "zh-Hans,zh-Hant,en.*"
-        type: string
-      user_agent:
-        description: "可选：浏览器UA（遇到风控时可配合cookies），留空则不传"
-        required: false
-        default: ""
         type: string
 
 jobs:
@@ -24,12 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1) 装 Node 作为 JS runtime（给 yt-dlp 用）
-      - name: Setup Node.js
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -37,43 +26,18 @@ jobs:
       - name: Install yt-dlp
         run: python -m pip install -U yt-dlp
 
-      # 2) （可选）写入 cookies.txt：把仓库 Secret: YTDLP_COOKIES_B64 解码
-      - name: Write cookies.txt (optional)
-        if: ${{ secrets.YTDLP_COOKIES_B64 != '' }}
-        env:
-          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
-        run: |
-          printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > cookies.txt
-          echo "cookies.txt written"
-
       - name: Download subtitles only
         env:
           URL: ${{ inputs.url }}
           LANGS: ${{ inputs.langs }}
-          UA: ${{ inputs.user_agent }}
-          HAS_COOKIES: ${{ secrets.YTDLP_COOKIES_B64 != '' }}
         run: |
-          set -e
           mkdir -p subs
 
-          # 先列出可用字幕（便于确认语言标签）
-          if [ "$HAS_COOKIES" = "true" ]; then
-            yt-dlp --js-runtimes node --cookies cookies.txt --list-subs "$URL" || true
-          else
-            yt-dlp --js-runtimes node --list-subs "$URL" || true
-          fi
+          # 1) 列出可用字幕/自动字幕
+          yt-dlp --list-subs "$URL"
 
-          # 组装可选参数
-          EXTRA_ARGS=()
-          if [ "$HAS_COOKIES" = "true" ]; then
-            EXTRA_ARGS+=(--cookies cookies.txt)
-          fi
-          if [ -n "$UA" ]; then
-            EXTRA_ARGS+=(--user-agent "$UA")
-          fi
-
+          # 2) 只下载字幕（含自动字幕），并尽量转成 srt
           yt-dlp \
-            --js-runtimes node \
             --skip-download \
             --write-subs \
             --write-auto-subs \
@@ -81,7 +45,6 @@ jobs:
             --sub-format "vtt/best" \
             --convert-subs "srt" \
             -o "subs/%(title).200s_%(id)s.%(ext)s" \
-            "${EXTRA_ARGS[@]}" \
             "$URL"
 
           ls -la subs
