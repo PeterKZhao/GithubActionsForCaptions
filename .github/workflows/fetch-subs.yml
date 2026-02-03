@@ -37,11 +37,10 @@ jobs:
       - name: Install yt-dlp
         run: python -m pip install -U yt-dlp
 
-      # 2) （可选）写入 cookies.txt：把仓库 Secret: YTDLP_COOKIES_B64 解码
+      # 2) （可选）写入 cookies.txt：把仓库 Secret: YTDLP_COOKIES_TXT 解码
       - name: Write cookies.txt (optional)
-        if: ${{ secrets.YTDLP_COOKIES_B64 != '' }}
         env:
-          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_B64 }}
+          YTDLP_COOKIES_B64: ${{ secrets.YTDLP_COOKIES_TXT }}
         run: |
           printf '%s' "$YTDLP_COOKIES_B64" | base64 -d > cookies.txt
           echo "cookies.txt written"
