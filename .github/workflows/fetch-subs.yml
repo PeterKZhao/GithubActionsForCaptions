@@ -17,19 +17,17 @@ on:
         required: false
         default: ""
         type: string
-      proxy:
-        description: "可选：代理，例如 http://user:pass@host:8080 或 socks5://host:1080"
-        required: false
-        default: ""
-        type: string
 
 jobs:
   subs:
     runs-on: ubuntu-latest
+    env:
+      YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js (JS runtime for yt-dlp)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -43,37 +41,38 @@ jobs:
         run: python -m pip install -U yt-dlp
 
       - name: Write cookies.txt (optional)
-        env:
-          YTDLP_COOKIES_TXT: ${{ secrets.YTDLP_COOKIES_TXT }}
+        if: ${{ env.YTDLP_COOKIES_TXT != '' }}
         shell: bash
         run: |
           printf '%s' "$YTDLP_COOKIES_TXT" | tr -d '\r' > cookies.txt
+          echo "cookies.txt written"
 
       - name: Download subtitles only
         env:
           URL: ${{ inputs.url }}
           LANGS: ${{ inputs.langs }}
           UA: ${{ inputs.user_agent }}
-          PROXY: ${{ inputs.proxy }}
-          HAS_COOKIES: ${{ secrets.YTDLP_COOKIES_TXT != '' }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p subs
 
           EXTRA_ARGS=()
-          if [ "$HAS_COOKIES" = "true" ]; then
+          if [ -s cookies.txt ]; then
             EXTRA_ARGS+=(--cookies cookies.txt)
           fi
-          if [ -n "$UA" ]; then
+          if [ -n "${UA:-}" ]; then
             EXTRA_ARGS+=(--user-agent "$UA")
           fi
-          if [ -n "$PROXY" ]; then
-            EXTRA_ARGS+=(--proxy "$PROXY")
-          fi
+
+          # 允许下载 EJS 远程组件（解决 JS challenge 缺格式问题）
+          REMOTE_ARGS=(--remote-components ejs:github)
+
+          yt-dlp --js-runtimes node "${REMOTE_ARGS[@]}" "${EXTRA_ARGS[@]}" --list-subs "$URL" || true
 
           yt-dlp \
             --js-runtimes node \
+            "${REMOTE_ARGS[@]}" \
             --skip-download \
             --write-subs \
             --write-auto-subs \
@@ -83,6 +82,8 @@ jobs:
             -o "subs/%(title).200s_%(id)s.%(ext)s" \
             "${EXTRA_ARGS[@]}" \
             "$URL"
+
+          ls -la subs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
